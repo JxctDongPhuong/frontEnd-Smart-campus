@@ -62,8 +62,10 @@ export default function App() {
   const handleSelectRoom = async (roomId) => {
     setSelectedRoomId(roomId);
     
-    // Find base room object from state or mock
-    const baseRoom = rooms.find(r => (r.ma_phong || r.id) === roomId) || mockCampusData.floorRooms.find(r => r.ma_phong === roomId);
+    // Find base room object from state or mock (hỗ trợ cả A.101 và A101)
+    const normalizedId = roomId.replace('.', '');
+    const baseRoom = rooms.find(r => (r.ma_phong || r.id) === roomId || (r.ma_phong || '').replace('.', '') === normalizedId) 
+      || mockCampusData.floorRooms.find(r => r.ma_phong === roomId || r.ma_phong.replace('.', '') === normalizedId);
     
     try {
       const [devices, schedule, metric] = await Promise.all([

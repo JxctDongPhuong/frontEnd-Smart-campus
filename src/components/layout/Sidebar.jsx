@@ -33,11 +33,11 @@ export function Sidebar({ activeTab = 'overview', onSelectTab, isOpen = false, o
         />
       )}
 
-      <aside className={`fixed inset-y-0 left-0 z-50 lg:static lg:z-30 w-64 bg-white border-r border-slate-200/90 flex flex-col h-screen select-none shadow-2xl lg:shadow-xs transition-transform duration-300 ease-in-out shrink-0 ${
+      <aside className={`fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:left-auto lg:z-30 w-64 bg-white border-r border-slate-200/90 flex flex-col h-screen max-h-screen select-none shadow-2xl lg:shadow-xs transition-transform duration-300 ease-in-out shrink-0 self-start ${
         isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       }`}>
         {/* Brand Header */}
-        <div className="h-16 px-6 flex items-center justify-between border-b border-slate-100">
+        <div className="h-16 px-6 flex items-center justify-between border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 animate-scale-in">
               <Building2 className="w-5 h-5" />
@@ -104,7 +104,7 @@ export function Sidebar({ activeTab = 'overview', onSelectTab, isOpen = false, o
       </div>
 
       {/* Footer System Status & Real User Profile from TaiKhoan */}
-      <div className="p-4 border-t border-slate-100 space-y-3 bg-slate-50/50">
+      <div className="p-4 border-t border-slate-100 space-y-3 bg-slate-50/50 shrink-0">
         {/* Live System Health */}
         <div className="p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5">
           <div className="relative flex items-center justify-center">
