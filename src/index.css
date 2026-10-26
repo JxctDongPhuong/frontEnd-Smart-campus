@@ -5,6 +5,7 @@
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
@@ -29,21 +30,204 @@
 
 /* Blueprint / Grid pattern for floor plan */
 .bg-grid-pattern {
-  background-size: 20px 20px;
+  background-size: 24px 24px;
   background-image: 
-    linear-gradient(to right, rgba(226, 232, 240, 0.6) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(226, 232, 240, 0.6) 1px, transparent 1px);
+    linear-gradient(to right, rgba(203, 213, 225, 0.45) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(203, 213, 225, 0.45) 1px, transparent 1px);
 }
 
-.pulse-indicator {
-  position: relative;
+/* Keyframe Animations */
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-.pulse-indicator::after {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border-radius: 9999px;
-  background-color: currentColor;
-  opacity: 0.4;
-  animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+
+@keyframes fadeInDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
+@keyframes scaleIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+  }
+}
+
+@keyframes pulseGlowWarning {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
+  }
+}
+
+@keyframes shimmerGradient {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Animation Utility Classes */
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in-down {
+  animation: fadeInDown 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-float-slow {
+  animation: floatSlow 4s ease-in-out infinite;
+}
+
+.pulse-glow {
+  animation: pulseGlow 2.5s infinite;
+}
+
+.pulse-glow-warning {
+  animation: pulseGlowWarning 2s infinite;
+}
+
+.shimmer-badge {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: shimmerGradient 2.5s infinite;
+}
+
+/* Staggered Delay Helpers */
+.stagger-1 { animation-delay: 60ms; }
+.stagger-2 { animation-delay: 120ms; }
+.stagger-3 { animation-delay: 180ms; }
+.stagger-4 { animation-delay: 240ms; }
+.stagger-5 { animation-delay: 300ms; }
+.stagger-6 { animation-delay: 360ms; }
+
+/* Interactive Hover transitions */
+.interactive-card {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
+}
+
+.interactive-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+}
+
+/* ==================== CHART FORMATION ANIMATIONS ==================== */
+@keyframes chartBarRise {
+  0% {
+    transform: scaleY(0);
+    opacity: 0.2;
+  }
+  65% {
+    transform: scaleY(1.06);
+  }
+  85% {
+    transform: scaleY(0.98);
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.chart-bar-animate {
+  transform-origin: bottom;
+  animation: chartBarRise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.chart-bar-delay-1 { animation-delay: 80ms; }
+.chart-bar-delay-2 { animation-delay: 160ms; }
+.chart-bar-delay-3 { animation-delay: 240ms; }
+.chart-bar-delay-4 { animation-delay: 320ms; }
+.chart-bar-delay-5 { animation-delay: 400ms; }
+.chart-bar-delay-6 { animation-delay: 480ms; }
+
+@keyframes donutSpinIn {
+  0% {
+    transform: rotate(-270deg) scale(0.9);
+    opacity: 0.3;
+  }
+  100% {
+    transform: rotate(-90deg) scale(1);
+    opacity: 1;
+  }
+}
+
+.donut-spin-in {
+  transform-origin: center;
+  animation: donutSpinIn 1s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes valuePopUp {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chart-value-pop {
+  animation: valuePopUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
