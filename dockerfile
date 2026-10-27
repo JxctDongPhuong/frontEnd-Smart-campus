@@ -6,6 +6,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
+ARG VITE_API_BASE_URL=https://smart-campus-backend-1-0.onrender.com
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
 COPY . .
 RUN npm run build
 
