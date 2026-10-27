@@ -14,13 +14,14 @@ import {
   Calendar,
   MessageSquare,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  ArrowUpDown
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../common/Card';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
 import { campusApi } from '../../services/api';
-import { mockCampusData } from '../../data/mockData';
 
 const STATUS_CONFIG = {
   Moi: { label: 'Mới tiếp nhận', variant: 'warning', icon: AlertTriangle },
@@ -29,13 +30,20 @@ const STATUS_CONFIG = {
   TuChoi: { label: 'Từ chối', variant: 'danger', icon: XCircle }
 };
 
-export function TicketsView() {
+export function TicketsView({ searchQuery = '' }) {
   const [reports, setReports] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('ALL');
-  const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState('PENDING'); // 'PENDING' | 'Moi' | 'DangXuLy' | 'DaXuLy' | 'ALL'
+  const [search, setSearch] = useState(searchQuery);
+  const [expandedTicketIds, setExpandedTicketIds] = useState([1]);
+
+  useEffect(() => {
+    if (searchQuery !== undefined && searchQuery !== null) {
+      setSearch(searchQuery);
+    }
+  }, [searchQuery]);
 
   // Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -64,13 +72,14 @@ export function TicketsView() {
         campusApi.getAllRoomsList(),
         campusApi.getAllDevicesList()
       ]);
-      setReports(reps?.length ? reps : mockCampusData.allReports);
-      setRooms(rms?.length ? rms : mockCampusData.allRooms);
-      setDevices(devs?.length ? devs : mockCampusData.allDevices);
-    } catch {
-      setReports(mockCampusData.allReports);
-      setRooms(mockCampusData.allRooms);
-      setDevices(mockCampusData.allDevices);
+      setReports(Array.isArray(reps) ? reps : []);
+      setRooms(Array.isArray(rms) ? rms : []);
+      setDevices(Array.isArray(devs) ? devs : []);
+    } catch (err) {
+      console.error('[TicketsView] Lỗi tải phiếu báo hỏng:', err);
+      setReports([]);
+      setRooms([]);
+      setDevices([]);
     } finally {
       setLoading(false);
     }
@@ -78,14 +87,45 @@ export function TicketsView() {
 
   useEffect(() => {
     loadData();
+
+    const handleCreated = (e) => {
+      if (e.detail) {
+        setReports(prev => [e.detail, ...prev.filter(r => String(r.ma_phieu || r.id) !== String(e.detail.ma_phieu || e.detail.id))]);
+      }
+    };
+
+    const handleUpdated = (e) => {
+      if (e.detail) {
+        setReports(prev => prev.map(r => String(r.ma_phieu || r.id) === String(e.detail.ma_phieu || e.detail.id) ? { ...r, ...e.detail } : r));
+      }
+    };
+
+    window.addEventListener('campus_report_created', handleCreated);
+    window.addEventListener('campus_report_updated', handleUpdated);
+
+    return () => {
+      window.removeEventListener('campus_report_created', handleCreated);
+      window.removeEventListener('campus_report_updated', handleUpdated);
+    };
   }, []);
 
-  // Filter
+  // Filter: Ở chế độ mặc định PENDING, chỉ hiển thị phiếu CẦN XỬ LÝ (Mới, Đang xử lý). 
+  // Phiếu sau khi Đã xử lý (DaXuLy) sẽ tự động biến mất khỏi danh sách chính!
   const filteredReports = reports.filter(r => {
-    const matchStatus = activeFilter === 'ALL' || r.trang_thai === activeFilter;
-    const matchSearch = (r.mo_ta || '').toLowerCase().includes(search.toLowerCase()) ||
-                        (r.ma_phong || '').toLowerCase().includes(search.toLowerCase()) ||
-                        (r.ma_tb || '').toLowerCase().includes(search.toLowerCase());
+    const matchStatus = activeFilter === 'ALL' 
+      ? true 
+      : activeFilter === 'PENDING'
+      ? (r.trang_thai === 'Moi' || r.trang_thai === 'DangXuLy')
+      : r.trang_thai === activeFilter;
+    const q = (search || '').trim().toLowerCase();
+    const matchSearch = !q ||
+                        (r.mo_ta || '').toLowerCase().includes(q) ||
+                        (r.ma_phong || '').toLowerCase().includes(q) ||
+                        (`phòng ${r.ma_phong || ''}`).toLowerCase().includes(q) ||
+                        (r.ma_tb || '').toLowerCase().includes(q) ||
+                        (r.nguoi_gui || '').toLowerCase().includes(q) ||
+                        (r.ghi_chu_admin || '').toLowerCase().includes(q) ||
+                        (String(r.id || r.ma_phieu || '')).includes(q);
     return matchStatus && matchSearch;
   });
 
@@ -106,7 +146,7 @@ export function TicketsView() {
     setIsProcessModalOpen(true);
   };
 
-  // Cập nhật tiến độ xử lý
+  // Cập nhật tiến độ xử lý: Sau khi xử lý xong (DaXuLy), phiếu tự động biến mất khỏi màn hình chờ
   const handleSaveProcess = async (e) => {
     e.preventDefault();
     const updatePayload = {
@@ -117,9 +157,9 @@ export function TicketsView() {
     };
 
     await campusApi.updateReport(selectedReport.ma_phieu, updatePayload);
-    setReports(prev => prev.map(r => r.ma_phieu === selectedReport.ma_phieu ? { ...r, ...updatePayload } : r));
     setIsProcessModalOpen(false);
-    alert('Đã cập nhật tiến độ xử lý phiếu báo hỏng thành công!');
+    await loadData();
+    alert('Đã cập nhật tiến độ và hoàn tất phiếu sự cố thành công!');
   };
 
   // Tạo phiếu mới
@@ -140,17 +180,10 @@ export function TicketsView() {
 
   return (
     <div className="space-y-6">
-      {/* 1. Header */}
+      {/* 1. Header with concise 3-word title */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-            <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Hệ thống Tiếp nhận PhieuBaoHong</span>
-          </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Quản Lý Sự Cố & Phiếu Báo Hỏng Thiết Bị</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Quy trình tiếp nhận phản ánh hư hỏng từ giảng viên/sinh viên và điều phối kỹ thuật viên xử lý kịp thời.
-          </p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Phiếu báo cáo sự cố</h1>
         </div>
 
         <Button 
@@ -159,15 +192,15 @@ export function TicketsView() {
           onClick={() => setIsCreateModalOpen(true)}
           className="text-xs shadow-md shadow-blue-500/20 active:scale-95"
         >
-          Gửi Phiếu Báo Hỏng Mới
+          Gửi Phiếu Báo Cáo Mới
         </Button>
       </div>
 
       {/* 2. KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="p-4 bg-gradient-to-br from-white to-slate-50">
+        <Card className="p-4 bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold text-slate-500">Tổng số phiếu</p>
+            <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Tổng số phiếu</p>
             <AlertTriangle className="w-4 h-4 text-slate-600" />
           </div>
           <p className="text-2xl font-black text-slate-900 mt-2">{totalReports}</p>
@@ -207,10 +240,11 @@ export function TicketsView() {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             {[
-              { id: 'ALL', label: 'Tất cả phiếu' },
+              { id: 'PENDING', label: `Cần xử lý (${moiCount + inProgressCount})` },
               { id: 'Moi', label: `Mới (${moiCount})` },
-              { id: 'DangXuLy', label: `Đang xử lý (${inProgressCount})` },
-              { id: 'DaXuLy', label: `Đã hoàn tất (${resolvedCount})` }
+              { id: 'DangXuLy', label: `Đang sửa (${inProgressCount})` },
+              { id: 'DaXuLy', label: `Đã hoàn tất (${resolvedCount})` },
+              { id: 'ALL', label: `Tất cả (${totalReports})` }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -239,82 +273,199 @@ export function TicketsView() {
         </div>
       </Card>
 
-      {/* 4. Ticket Cards List */}
-      <div className="space-y-4">
-        {filteredReports.map((report) => {
-          const statusConf = STATUS_CONFIG[report.trang_thai] || STATUS_CONFIG.Moi;
-          const StatusIcon = statusConf.icon;
-
-          return (
-            <Card key={report.ma_phieu} hover className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div className="space-y-2 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-extrabold text-sm text-slate-900">Phiếu #{report.ma_phieu}</span>
-                  <Badge variant={statusConf.variant} size="sm">
-                    <StatusIcon className="w-3 h-3" />
-                    <span>{statusConf.label}</span>
-                  </Badge>
-
-                  {report.muc_do && (
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      report.muc_do === 'NghiemTrong' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      Mức độ: {report.muc_do === 'NghiemTrong' ? 'Nghiêm trọng' : 'Bình thường'}
-                    </span>
-                  )}
-
-                  <span className="text-xs text-slate-400">
-                    • Báo bởi: {report.nguoi_bao_ten || `Tài khoản #${report.ma_tk}`}
-                  </span>
-                </div>
-
-                <h4 className="font-bold text-sm text-slate-800">{report.mo_ta}</h4>
-
-                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-1">
-                  <span className="flex items-center gap-1 font-bold text-blue-700">
-                    <DoorClosed className="w-3.5 h-3.5" /> Phòng {report.ma_phong}
-                  </span>
-
-                  {report.ma_tb && (
-                    <span className="flex items-center gap-1 font-mono text-slate-700 font-semibold bg-slate-100 px-2 py-0.5 rounded">
-                      <Monitor className="w-3.5 h-3.5 text-slate-400" /> {report.ten_tb ? `${report.ten_tb} (${report.ma_tb})` : report.ma_tb}
-                    </span>
-                  )}
-
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" /> Ngày gửi: {new Date(report.ngay_bao).toLocaleDateString('vi-VN')}
-                  </span>
-                </div>
-
-                {/* Admin notes */}
-                {report.ghi_chu_admin && (
-                  <div className="p-2.5 rounded-xl bg-blue-50/50 border border-blue-100 text-xs text-blue-900 mt-2">
-                    <span className="font-bold block">Tiến độ kỹ thuật / Kết quả xử lý:</span>
-                    <span>{report.ghi_chu_admin}</span>
-                    {report.ngay_xu_ly && (
-                      <span className="block text-[10px] text-blue-500 mt-0.5">
-                        Hoàn thành lúc: {new Date(report.ngay_xu_ly).toLocaleDateString('vi-VN')}
-                      </span>
-                    )}
+      {/* 4. ERP Master-Detail Table Layout (Bố cục theo Hình 4) */}
+      <div className="bg-white rounded-xl border border-slate-300 overflow-hidden shadow-xs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            {/* Primary Dark Blue Table Header */}
+            <thead>
+              <tr className="bg-[#1976d2] text-white font-bold select-none text-[11px] whitespace-nowrap">
+                <th className="py-2.5 px-3 w-8 text-center"></th>
+                <th className="py-2.5 px-3">
+                  <div className="flex items-center gap-1">
+                    <span>Mã Phiếu</span>
+                    <ArrowUpDown className="w-3 h-3 opacity-70" />
                   </div>
-                )}
-              </div>
+                </th>
+                <th className="py-2.5 px-3">
+                  <div className="flex items-center gap-1">
+                    <span>Mô Tả Sự Cố</span>
+                    <ArrowUpDown className="w-3 h-3 opacity-70" />
+                  </div>
+                </th>
+                <th className="py-2.5 px-3">
+                  <div className="flex items-center gap-1">
+                    <span>Thiết Bị</span>
+                    <ArrowUpDown className="w-3 h-3 opacity-70" />
+                  </div>
+                </th>
+                <th className="py-2.5 px-3">
+                  <div className="flex items-center gap-1">
+                    <span>Vị Trí</span>
+                    <ArrowUpDown className="w-3 h-3 opacity-70" />
+                  </div>
+                </th>
+                <th className="py-2.5 px-3">
+                  <div className="flex items-center gap-1">
+                    <span>Người Báo</span>
+                    <ArrowUpDown className="w-3 h-3 opacity-70" />
+                  </div>
+                </th>
+                <th className="py-2.5 px-3 text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <span>Mức Độ</span>
+                    <ArrowUpDown className="w-3 h-3 opacity-70" />
+                  </div>
+                </th>
+                <th className="py-2.5 px-3 text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <span>Ngày Báo</span>
+                    <ArrowUpDown className="w-3 h-3 opacity-70" />
+                  </div>
+                </th>
+                <th className="py-2.5 px-3 text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <span>Trạng Thái</span>
+                    <ArrowUpDown className="w-3 h-3 opacity-70" />
+                  </div>
+                </th>
+                <th className="py-2.5 px-3 text-right">
+                  <span>Thao Tác</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 font-normal text-slate-800">
+              {filteredReports.map((report) => {
+                const isExpanded = expandedTicketIds.includes(report.ma_phieu);
+                const statusConf = STATUS_CONFIG[report.trang_thai] || STATUS_CONFIG.Moi;
 
-              {/* Action Button for Admin */}
-              <div className="self-end md:self-center shrink-0">
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  icon={Wrench}
-                  onClick={() => handleOpenProcess(report)}
-                  className="text-xs hover:border-blue-500 hover:text-blue-600"
-                >
-                  Cập Nhật Tiến Độ
-                </Button>
-              </div>
-            </Card>
-          );
-        })}
+                const toggleExpand = (id) => {
+                  setExpandedTicketIds(prev =>
+                    prev.includes(id) ? prev.filter(k => k !== id) : [...prev, id]
+                  );
+                };
+
+                return (
+                  <React.Fragment key={report.ma_phieu}>
+                    {/* Master Row */}
+                    <tr
+                      onClick={() => toggleExpand(report.ma_phieu)}
+                      className={`hover:bg-blue-50/50 cursor-pointer transition-colors text-[11px] ${
+                        isExpanded ? 'bg-blue-50/70 font-semibold' : 'bg-white'
+                      }`}
+                    >
+                      <td className="py-2 px-2 text-center text-slate-400">
+                        {isExpanded ? (
+                          <ChevronDown className="w-3.5 h-3.5 text-blue-600 inline" />
+                        ) : (
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400 inline" />
+                        )}
+                      </td>
+                      <td className="py-2 px-3 font-mono font-bold text-slate-900 whitespace-nowrap">
+                        #{report.ma_phieu}
+                      </td>
+                      <td className="py-2 px-3 max-w-xs truncate text-slate-800" title={report.mo_ta}>
+                        {report.mo_ta}
+                      </td>
+                      <td className="py-2 px-3 font-mono text-slate-700 whitespace-nowrap">
+                        {report.ten_tb ? `${report.ten_tb} (${report.ma_tb})` : (report.ma_tb || 'Không xác định')}
+                      </td>
+                      <td className="py-2 px-3 font-semibold text-blue-700 whitespace-nowrap">
+                        Phòng {report.ma_phong}
+                      </td>
+                      <td className="py-2 px-3 text-slate-600 whitespace-nowrap">
+                        {report.nguoi_bao_ten || `TK #${report.ma_tk}`}
+                      </td>
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
+                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                          report.muc_do === 'NghiemTrong' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {report.muc_do === 'NghiemTrong' ? 'Nghiêm trọng' : 'Bình thường'}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-center text-slate-600 whitespace-nowrap font-mono">
+                        {new Date(report.ngay_bao).toLocaleDateString('vi-VN')}
+                      </td>
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
+                        <Badge variant={statusConf.variant} size="sm">
+                          {statusConf.label}
+                        </Badge>
+                      </td>
+                      <td className="py-2 px-3 text-right whitespace-nowrap">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenProcess(report);
+                          }}
+                          className="px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer"
+                        >
+                          Cập nhật
+                        </button>
+                      </td>
+                    </tr>
+
+                    {/* Sub-table (Bố cục Hình 4) */}
+                    {isExpanded && (
+                      <tr className="bg-slate-50/60">
+                        <td colSpan={10} className="py-2 px-3 pl-8">
+                          <div className="w-full max-w-3xl rounded border border-blue-200 overflow-hidden shadow-2xs">
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className="bg-[#1e88e5] text-white font-bold text-[11px]">
+                                  <th className="py-1 px-3">Trạng Thái</th>
+                                  <th className="py-1 px-3">Vị Trí</th>
+                                  <th className="py-1 px-3">Lô / Mã TB</th>
+                                  <th className="py-1 px-3">Nội Dung Chi Tiết Sự Cố & Tiến Độ Kỹ Thuật</th>
+                                  <th className="py-1 px-3 text-right">Xử Lý</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-blue-100 bg-white text-[11px]">
+                                <tr className="hover:bg-blue-50/50">
+                                  <td className="py-2 px-3 align-top">
+                                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                                      {statusConf.label}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 px-3 font-semibold text-slate-800 align-top">
+                                    Phòng {report.ma_phong}
+                                  </td>
+                                  <td className="py-2 px-3 font-mono text-slate-700 align-top">
+                                    {report.ma_tb || 'TB_CHUNG'}
+                                  </td>
+                                  <td className="py-2 px-3 text-slate-700 space-y-1 align-top">
+                                    <p className="font-semibold text-slate-900">{report.mo_ta}</p>
+                                    {report.ghi_chu_admin ? (
+                                      <p className="text-blue-700 bg-blue-50 p-1.5 rounded text-[10px]">
+                                        <span className="font-bold">Ghi chú kỹ thuật: </span>
+                                        {report.ghi_chu_admin}
+                                      </p>
+                                    ) : (
+                                      <p className="text-slate-400 italic text-[10px]">Chưa có ghi chú xử lý từ kỹ thuật viên</p>
+                                    )}
+                                  </td>
+                                  <td className="py-2 px-3 text-right align-top">
+                                    <Button
+                                      size="sm"
+                                      variant="primary"
+                                      onClick={() => handleOpenProcess(report)}
+                                      className="text-[10px] py-1 px-2.5"
+                                    >
+                                      Xử Lý Ngay
+                                    </Button>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* 5. Modal Cập nhật tiến độ xử lý (Admin) */}

@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Search, 
   Bell, 
   RotateCw, 
   Sparkles, 
@@ -17,6 +16,8 @@ import {
   Menu
 } from 'lucide-react';
 
+import { UserAccountMenu } from './UserAccountMenu';
+
 export function Header({ 
   activeTab = 'overview', 
   onSelectTab, 
@@ -28,6 +29,9 @@ export function Header({
 }) {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const notifRef = useRef(null);
+
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const accountRef = useRef(null);
 
   // Danh sách thông báo thực tế đồng bộ từ Backend & Hệ thống AI
   const [notifications, setNotifications] = useState([
@@ -83,6 +87,9 @@ export function Header({
       if (notifRef.current && !notifRef.current.contains(event.target)) {
         setIsNotifOpen(false);
       }
+      if (accountRef.current && !accountRef.current.contains(event.target)) {
+        setIsAccountMenuOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -106,12 +113,13 @@ export function Header({
   };
 
   const tabTitles = {
-    overview: 'Tổng quan Vận hành & Năng lượng',
-    rooms: 'Danh mục Phòng học (Phong)',
-    schedule: 'Thời khóa biểu & Mượn phòng (LichPhong)',
-    devices: 'Thiết bị & Kho tài sản (ThietBi)',
-    energy: 'Chỉ số Điện năng & Tiết kiệm AI (DienNang)',
-    tickets: 'Phiếu Báo hỏng & Sửa chữa (PhieuBaoHong)'
+    overview: 'Tổng quan',
+    rooms: 'Phòng học',
+    'room-plan': 'Sơ đồ phòng',
+    schedule: 'Lịch học',
+    devices: 'Thiết bị',
+    energy: 'Điện năng',
+    tickets: 'Báo hỏng'
   };
 
   return (
@@ -136,21 +144,6 @@ export function Header({
         </div>
       </div>
 
-      {/* Center Search Input */}
-      <div className="w-72 lg:w-96 max-w-md relative hidden md:block mx-4">
-        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-        <input
-          type="text"
-          placeholder="Tìm phòng (A101, B302), môn học, thiết bị..."
-          onChange={(e) => onSearch?.(e.target.value)}
-          className="w-full pl-10 pr-12 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400 text-slate-700 font-medium"
-        />
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-mono text-slate-400">
-          <Command className="w-2.5 h-2.5" />
-          <span>K</span>
-        </div>
-      </div>
-
       {/* Right Controls */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* AI Copilot Quick Action */}
@@ -161,15 +154,6 @@ export function Header({
           <Sparkles className="w-3.5 h-3.5 text-purple-600 animate-pulse shrink-0" />
           <span className="hidden sm:inline">Trợ Lý Nexus AI</span>
           <span className="sm:hidden text-[11px]">AI</span>
-        </button>
-
-        {/* Refresh API Data */}
-        <button
-          onClick={onRefresh}
-          title="Đồng bộ dữ liệu từ Backend FastAPI"
-          className="p-2 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all active:scale-90 cursor-pointer"
-        >
-          <RotateCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-600' : ''}`} />
         </button>
 
         {/* Interactive Notifications Bell */}
@@ -288,12 +272,20 @@ export function Header({
           )}
         </div>
 
-        {/* Profile Avatar: Admin */}
-        <div 
-          title="Tài khoản: Ban Quản Lý Cơ Sở Vật Chất (Admin)"
-          className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-bold ring-2 ring-slate-100 shadow-xs cursor-default"
-        >
-          QL
+        {/* Profile Avatar: Admin with YouTube-like Account Menu */}
+        <div className="relative" ref={accountRef}>
+          <button 
+            onClick={() => setIsAccountMenuOpen(prev => !prev)}
+            title="Quản lý thông tin tài khoản và đăng nhập/đăng xuất"
+            className="w-8 h-8 rounded-full bg-slate-900 hover:bg-slate-800 flex items-center justify-center text-white text-xs font-bold ring-2 ring-blue-500/30 hover:ring-blue-500 shadow-xs cursor-pointer transition-all active:scale-95"
+          >
+            QL
+          </button>
+
+          <UserAccountMenu 
+            isOpen={isAccountMenuOpen} 
+            onClose={() => setIsAccountMenuOpen(false)} 
+          />
         </div>
       </div>
     </header>
